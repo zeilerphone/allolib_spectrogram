@@ -1,6 +1,9 @@
 #ifndef INCLUDE_SPECTROGRAM_HPP
 #define INCLUDE_SPECTROGRAM_HPP
 
+#include <algorithm>
+#include <functional>
+
 #include "Gamma/Analysis.h"
 #include "Gamma/Gamma.h"
 #include "Gamma/DFT.h"
@@ -21,8 +24,7 @@ namespace al {
         //  ws : number of horizontal segments - how many strips wide
         //  hs : number of vertical segments - how many segments high
         //  is_log : boolean switch for whether to distribute vertical segments linearly or logarithmically
-        Grid(float w, float h, int ws, int hs, bool is_log) : width(w), height(h),
-            width_of_strips(w / ws), width_segments(ws), height_segments(hs), is_logarithmic(is_log);
+        Grid(float w, float h, int ws, int hs, bool is_log);
 
         /*
         * A strip is a mesh of customizable dimension that is two vertices wide and user specified vertices tall.
@@ -35,8 +37,7 @@ namespace al {
             //  h : height (2 is screen height) of strip
             //  s : number of segments the strip should be split into
             //  is_log : boolean switch for whether to distribute strips linearly or logarithmically
-            Strip(float w, float h, int s, bool is_log) : width(w), height(h), segments(s),
-                segment_height(h / s), is_logarithmic(is_log);
+            Strip(float w, float h, int s, bool is_log);
 
             /* 
                 Assigns strip vertex colors based off of input std::vector<float>.
@@ -67,7 +68,7 @@ namespace al {
         int width_segments, height_segments;
         int writePointer;
         std::vector<Strip*> strips;
-        bool is_logarithmic
+        bool is_logarithmic;
     };
 
     /*
@@ -81,12 +82,11 @@ namespace al {
         // Constructor for class Spectrogram
         //  sample_buffer_size: determines how many past samples the Spectrogram should store
         //  fft_window_size: determines how many bins the Short-Time Fourier Transform uses
+        //  x,y: the x and y coordinate offset for the spectrogram display
         //  w,h: the width and height of the spectrogram respectively
+        //  ler: legend ratio - what percentage of the width and height for spectrogram vs legend
         //  is_log: switch for linear or logarithmic frequency display
-        Spectrogram(int samplerate, int fft_window_size, float x, float y, float w, float h, float ler, bool is_log) :
-            bufferSize(samplerate), numBins(fft_window_size), grid_width(w* ler), legend_ratio(ler),
-            stft(fft_window_size, fft_window_size / 4, 0, gam::HANN, gam::MAG_FREQ),
-            grid(w* ler, h, samplerate, fft_window_size, is_log), width(w), height(h), x_offset(x), y_offset(y), is_logarithmic(is_log);
+        Spectrogram(int samplerate, int fft_window_size, float x, float y, float w, float h, float ler, bool is_log);
 
         // writes a sample from audio output to the internal STFT and buffers
         void write_sample(float sample);
@@ -110,7 +110,7 @@ namespace al {
         bool is_logarithmic;
 
         int bufferWrite;
-        vector<vector<float>> spectrum;
+        std::vector<std::vector<float>> spectrum;
         gam::STFT stft;
         Grid::Strip* legend_strip;
         float ref;
@@ -120,7 +120,7 @@ namespace al {
 
     Grid::Strip::Strip(float w, float h, int s, bool is_log) : width(w), height(h), segments(s), segment_height(h / s), is_logarithmic(is_log)
     {
-        zero_color = getColor(0.f);
+        zero_color = get_color(0.f);
         float segment_scale_factor = static_cast<float>(segments) / log10(segments);
         this->primitive(TRIANGLE_STRIP);
         for (int i = 0; i <= segments; i++) {
@@ -140,7 +140,7 @@ namespace al {
         }
     }
 
-    void Grid::Strip::map_value_to_color(vector<float> vals) {
+    void Grid::Strip::map_value_to_color(std::vector<float> vals) {
         // need to pass in vector of values between zero and one
         // zero is for no amplitude, one is for max
         // first value is the lowest pitch bucket, last is highest
@@ -204,7 +204,7 @@ namespace al {
         }
     }
 
-    void Grid::write_data(vector<float> vals) {
+    void Grid::write_data(std::vector<float> vals) {
         strips[writePointer]->map_value_to_color(vals);
         writePointer = (writePointer + 1) % width_segments;
     }
@@ -243,7 +243,7 @@ namespace al {
         g.loadIdentity();
         g.meshColor();
         g.translate(x_offset, y_offset);
-        g.translate((-width + grid_width / bufferSize) / 2.f, height / 2);
+        g.translate((-width + grid_width / bufferSize) / 2.f, 0);
         for (int i = 0; i < bufferSize; i++) {
             g.draw(*grid.read_data(i));
             g.translate(grid_width / bufferSize, 0);
@@ -251,7 +251,7 @@ namespace al {
         // draw legend
         g.loadIdentity();
         g.translate(x_offset, y_offset);
-        g.translate((width - (1 - legend_ratio) * 1.5 * width / 2) / 2.f, height / 2);
+        g.translate((width - (1 - legend_ratio) * 1.5 * width / 2) / 2.f, 0);
         g.draw(*legend_strip);
     }
 
@@ -262,7 +262,7 @@ namespace al {
     }
 
     void Spectrogram::InitLegend() {
-        vector<float> gradient;
+        std::vector<float> gradient;
         for (int i = 0; i < numBins; i++) {
             gradient.push_back(i * (height / 2) / numBins);
         }
