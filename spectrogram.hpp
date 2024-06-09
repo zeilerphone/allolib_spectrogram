@@ -80,13 +80,13 @@ namespace al {
     class Spectrogram {
     public:
         // Constructor for class Spectrogram
-        //  sample_buffer_size: determines how many past samples the Spectrogram should store
+        //  buffer_size: determines how many past STFT outputs the Spectrogram should store
         //  fft_window_size: determines how many bins the Short-Time Fourier Transform uses
-        //  x,y: the x and y coordinate offset for the spectrogram display
+        //  x,z: the x and y coordinate offset for the spectrogram display
         //  w,h: the width and height of the spectrogram respectively
         //  ler: legend ratio - what percentage of the width and height for spectrogram vs legend
         //  is_log: switch for linear or logarithmic frequency display
-        Spectrogram(int samplerate, int fft_window_size, float x, float y, float w, float h, float ler, bool is_log);
+        Spectrogram(int buffer_size, int fft_window_size, int hop_size, float x, float z, float w, float h, float ler, bool is_log, bool is_sphere);
 
         // writes a sample from audio output to the internal STFT and buffers
         void write_sample(float sample);
@@ -104,10 +104,10 @@ namespace al {
     protected:
         void InitLegend();
 
-        int bufferSize, numBins;
-        float width, height, x_offset, y_offset;
+        int bufferSize, numBins, hopSize;
+        float width, height, x_offset, z_offset;
         float grid_width, legend_ratio;
-        bool is_logarithmic;
+        bool is_logarithmic, is_spherical;
 
         int bufferWrite;
         std::vector<std::vector<float>> spectrum;
@@ -128,14 +128,14 @@ namespace al {
             this->color(zero_color);
             if (is_logarithmic) {
                 float log_normalized = log10(static_cast<float>(i) + 1.f) / log10(segments + 1.f);
-                float y_pos_log = height * log_normalized - (height / 2);
-                this->vertex(-width / 2, y_pos_log);
-                this->vertex(width / 2, y_pos_log);
+                float z_pos_log = height * log_normalized - (height / 2);
+                this->vertex(-width / 2, z_pos_log);
+                this->vertex(width / 2, z_pos_log);
             }
             else {
-                float y_pos_lin = segment_height * static_cast<float>(i) - height / 2;
-                this->vertex(-width / 2, y_pos_lin);
-                this->vertex(width / 2, y_pos_lin);
+                float z_pos_lin = segment_height * static_cast<float>(i) - height / 2;
+                this->vertex(-width / 2, z_pos_lin);
+                this->vertex(width / 2, z_pos_lin);
             }
         }
     }
@@ -213,10 +213,11 @@ namespace al {
         return strips[(writePointer + index) % width_segments];
     }
 
-    Spectrogram::Spectrogram(int samplerate, int fft_window_size, float x, float y, float w, float h, float ler, bool is_log) :
-        bufferSize(samplerate), numBins(fft_window_size), grid_width(w* ler), legend_ratio(ler),
-        stft(fft_window_size, fft_window_size / 4, 0, gam::HANN, gam::MAG_FREQ),
-        grid(w* ler, h, samplerate, fft_window_size, is_log), width(w), height(h), x_offset(x), y_offset(y), is_logarithmic(is_log)
+    Spectrogram::Spectrogram(int samplerate, int fft_window_size, int hop_size, float x, float z, float w, float h, float ler, bool is_log, bool is_sphere) :
+        bufferSize(samplerate), numBins(fft_window_size), hopSize(hop_size), grid_width(w* ler), legend_ratio(ler),
+        stft(fft_window_size, hop_size, 0, gam::HANN, gam::MAG_FREQ),
+        grid(w* ler, h, samplerate, fft_window_size, is_log), width(w), height(h), x_offset(x), z_offset(z), 
+        is_logarithmic(is_log), is_spherical(is_sphere)
     {
         spectrum.resize(bufferSize);
         for (int i = 0; i < bufferSize; i++) {
@@ -242,7 +243,8 @@ namespace al {
         // draw spectrogram
         g.loadIdentity();
         g.meshColor();
-        g.translate(x_offset, y_offset);
+        g.translate(x_offset, z_offset);
+        //if(is_spherical) g.translate()
         g.translate((-width + grid_width / bufferSize) / 2.f, 0);
         for (int i = 0; i < bufferSize; i++) {
             g.draw(*grid.read_data(i));
@@ -250,7 +252,7 @@ namespace al {
         }
         // draw legend
         g.loadIdentity();
-        g.translate(x_offset, y_offset);
+        g.translate(x_offset, z_offset);
         g.translate((width - (1 - legend_ratio) * 1.5 * width / 2) / 2.f, 0);
         g.draw(*legend_strip);
     }

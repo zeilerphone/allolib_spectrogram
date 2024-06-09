@@ -22,267 +22,6 @@
 using namespace std;
 using namespace al;
 
-//class System1 : public SynthVoice {
-//
-//};
-
-//class Oscilliscope : public Mesh {
-//public:
-//    Oscilliscope(int samplerate) : bufferSize(samplerate) {
-//        this->primitive(Mesh::LINE_STRIP);
-//        for (int i = 0; i < bufferSize; i++) {
-//            this->vertex((i / static_cast<float>(bufferSize)) * 1.8f - 0.9f, 0);
-//            buffer.push_back(0.f);
-//        }
-//        bufferWrite = 0;
-//    }
-//
-//    void writeSample(float sample) {
-//        buffer[bufferWrite] = sample;
-//        bufferWrite = (bufferWrite + 1) % bufferSize;
-//    }
-//
-//    void update() {
-//        for (int i = 0; i < bufferSize; i++) {
-//            this->vertices()[i][1] = buffer[(bufferWrite + i) % bufferSize];
-//        }
-//    }
-//
-//protected:
-//    int bufferSize;
-//    int bufferWrite;
-//    vector<float> buffer;
-//};
-
-/*
-* A strip is a mesh of customizable dimension that is two vertices wide and user specified vertices tall. 
-* Strips are meant to display data using color, and currently use the same color scheme as Matlab's "Jet" color palette.
-*/
-//class Strip : public Mesh {
-//public:
-//    // Constructor for class Strip
-//    //  w : width (2 is screen width) of strip
-//    //  h : height (2 is screen height) of strip
-//    //  s : number of segments the strip should be split into
-//    //  is_log : boolean switch for whether to distribute strips linearly or logarithmically
-//    Strip(float w, float h, int s, bool is_log) : width(w), height(h), segments(s), segment_height(h / s), is_logarithmic(is_log)
-//    {
-//        zero_color = getColor(0.);
-//        float segment_scale_factor = static_cast<float>(segments) / log10(segments);
-//        this->primitive(TRIANGLE_STRIP);
-//        for (int i = 0; i <= segments; i++) {
-//            this->color(zero_color);
-//            this->color(zero_color);
-//            if (is_logarithmic) {
-//                float log_normalized = log10(static_cast<float>(i) + 1.f) / log10(segments + 1.f);
-//                float y_pos_log = height * log_normalized - (height / 2);
-//                this->vertex(-width / 2, y_pos_log);
-//                this->vertex(width / 2, y_pos_log);
-//            }
-//            else {
-//                float y_pos_lin = segment_height * static_cast<float>(i) - height / 2;
-//                this->vertex(-width / 2, y_pos_lin);
-//                this->vertex(width / 2, y_pos_lin);
-//            }
-//        }
-//    }
-//
-//    // assigns strip vertex colors based off of input std::vector 
-//    // size must match
-//    void map_value_to_color(vector<float> vals) {
-//        // need to pass in vector of values between zero and one
-//        // zero is for no amplitude, one is for max
-//        // first value is the lowest pitch bucket, last is highest
-//        // vector needs to have size 'segments' or 'segments + 1'
-//        for (int i = 0; i < segments; i++) {
-//            RGB curCol = getColor(vals[i]);
-//            this->colors()[2 * i] = curCol;
-//            this->colors()[2 * i + 1] = curCol;
-//        }
-//    }
-//
-//protected:
-//    RGB getColor(float val) {
-//        // ripped from matlab's jet color map
-//        // 0.1242 0.3747 0.6253 0.8758
-//        if (val < 0) val = 0;
-//        if (val > 1) val = 1;
-//        float dr, dg, db;
-//        if (val < 0.1242) {
-//            db = 0.504 + ((1. - 0.504) / 0.1242) * val;
-//            dr = dg = 0;
-//        }
-//        else if (val < 0.3747) {
-//            db = 1.;
-//            dr = 0.;
-//            dg = (val - 0.1242) * (1. / (0.3747 - 0.1242));
-//        }
-//        else if (val < 0.6253) {
-//            db = (0.6253 - val) * (1. / (0.6253 - 0.3747));
-//            dg = 1.;
-//            dr = (val - 0.3747) * (1. / (0.6253 - 0.3747));
-//        }
-//        else if (val < 0.8758) {
-//            db = 0.;
-//            dr = 1.;
-//            dg = (0.8758 - val) * (1. / (0.8758 - 0.6253));
-//        }
-//        else {
-//            db = 0.;
-//            dg = 0.;
-//            dr = 1. - (val - 0.8758) * ((1. - 0.504) / (1. - 0.8758));
-//        }
-//        return RGB(dr, dg, db);
-//    }
-//    float width, height, segment_height;
-//    int segments;
-//    RGB zero_color;
-//    bool is_logarithmic;
-//};
-//
-///*
-//A Grid manages writing to and reading from a vector of Strip objects.
-//The number of strip objects and parameters for the strip objects are parameters in the Grid constructor.
-//*/
-//class Grid {
-//public:
-//    // Constructor for class Grid
-//    //  w : width (0 - 2) of grid
-//    //  h : height (0 - 2) of grid
-//    //  ws : number of horizontal segments - how many strips wide
-//    //  hs : number of vertical segments - how many segments high
-//    //  is_log : boolean switch for whether to distribute vertical segments linearly or logarithmically
-//    Grid(float w, float h, int ws, int hs, bool is_log) :
-//        width(w), height(h), width_of_strips(w / ws),
-//        width_segments(ws), height_segments(hs), is_logarithmic(is_log)
-//    {
-//        int strip_scale_factor = 1;
-//        for (int i = 0; i < width_segments; i++) {
-//            Strip* thisStrip = new Strip(width_of_strips, height, height_segments / strip_scale_factor, is_logarithmic);
-//            strips.push_back(thisStrip);
-//        }
-//        writePointer = 0;
-//    }
-//
-//    // Grid destructor
-//    ~Grid() {
-//        for (int i = 0; i < width_segments; i++) {
-//            delete strips[i];
-//        }
-//    }
-//
-//    // writes a std::vector of floats into the next Strip
-//    void write_data(vector<float> vals) {
-//        strips[writePointer]->map_value_to_color(vals);
-//        writePointer = (writePointer + 1) % width_segments;
-//    }
-//
-//    // returns a pointer to the Strip that is 'index' places past the current Strip
-//    Strip* read_data(int index) {
-//        return strips[(writePointer + index) % width_segments];
-//    }
-//
-//protected:
-//    float width, height, width_of_strips;
-//    int width_segments, height_segments;
-//    int writePointer;
-//    vector<Strip*> strips;
-//    bool is_logarithmic;
-//};
-//
-//
-///*
-//A Spectogram displays the frequency decomposition of a digital signal over time. The x-axis is time, 
-//the y-axis is frequency, and the color represents the amplitude of each frequency.
-//The Spectrogram class consists of a Grid object, a legend to define which colors correspond to which freqencies,
-//a Short-Time Fourier transform object from Gamma, and internal variables and parameters.
-//*/
-//class Spectrogram {
-//public:
-//    // Constructor for class Spectrogram
-//    //  sample_buffer_size: determines how many past samples the Spectrogram should store
-//    //  fft_window_size: determines how many bins the Short-Time Fourier Transform uses
-//    //  x,y: the x and y coordinate offset for the spectrogram display
-//    //  w,h: the width and height of the spectrogram respectively
-//    //  ler: legend ratio - what percentage of the width and height for spectrogram vs legend
-//    //  is_log: switch for linear or logarithmic frequency display
-//    Spectrogram(int samplerate, int fft_window_size, float x, float y, float w, float h, float ler, bool is_log) :
-//        bufferSize(samplerate), numBins(fft_window_size), grid_width(w * ler), legend_ratio(ler), 
-//        stft(fft_window_size, fft_window_size / 4, 0, gam::HANN, gam::MAG_FREQ),
-//        grid(w * ler, h, samplerate, fft_window_size, is_log), width(w), height(h), x_offset(x), y_offset(y), is_logarithmic(is_log)
-//    {
-//        spectrum.resize(bufferSize);
-//        for (int i = 0; i < bufferSize; i++) {
-//            spectrum[i].resize(numBins);
-//        }
-//        bufferWrite = 0;
-//        ref = 0.50;
-//
-//        InitLegend();
-//    }
-//
-//    // writes a sample from audio output to the internal STFT and buffers
-//    void writeSample(float sample) {
-//        if (stft(sample)) {
-//            for (int i = 0; i < numBins; ++i) {
-//                float val = stft.bin(i).real();
-//                spectrum[bufferWrite][i] = 1.5 * (log10(32 * (val)+ref) + 0.3);
-//            }
-//            grid.write_data(spectrum[bufferWrite]);
-//            bufferWrite = (bufferWrite + 1) % bufferSize;
-//        }
-//    }
-//
-//    // draws the Spectrogram on graphics object 'g'
-//    void draw(Graphics& g) {
-//        // draw spectrogram
-//        g.loadIdentity();
-//        g.meshColor();
-//        g.translate(x_offset, y_offset);
-//        g.translate((-width + grid_width / bufferSize) / 2.f, height / 2);
-//        for (int i = 0; i < bufferSize; i++) {
-//            g.draw(*grid.read_data(i));
-//            g.translate(grid_width / bufferSize, 0);
-//        }
-//        // draw legend
-//        g.loadIdentity();
-//        g.translate(x_offset, y_offset);
-//        g.translate((width - (1 - legend_ratio) * 1.5 * width / 2) / 2.f, height / 2);
-//        g.draw(*legend_strip);
-//        // draw labels (unimplemented)
-//    }
-//
-//    // records audio data from channel 0 to the internal STFT and buffers
-//    // only use and pass 'io' if this is the only thing using the audio data
-//    // otherwise use Spectrogram::writeSample instead
-//    void process_audio(AudioIOData& io) {
-//        while (io()) {
-//            writeSample(io.out(0));
-//        }
-//    }
-//    Grid grid;
-//
-//protected:
-//    void InitLegend() {
-//        vector<float> gradient;
-//        for (int i = 0; i < numBins; i++) {
-//            gradient.push_back(i * (height / 2) / numBins);
-//        }
-//        legend_strip = new Strip((1 - legend_ratio) * 1.5 * width / 2, height, numBins, false);
-//        legend_strip->map_value_to_color(gradient);
-//    }
-//    int bufferSize, numBins;
-//    float width, height, x_offset, y_offset;
-//    float grid_width, legend_ratio;
-//    bool is_logarithmic;
-//
-//    int bufferWrite;
-//    vector<vector<float>> spectrum;
-//    gam::STFT stft;
-//    Strip* legend_strip;
-//    float ref;
-//};
-
 class AcidTest : public SynthVoice{
 public:
     gam::Accum<> tmr;
@@ -423,14 +162,15 @@ public:
 
 class MyApp: public App {
 public:
+    bool is_spherical = false;
     SynthGUIManager<AcidTest> synthManager{ "" };
-    Spectrogram mySpec{ 800, 512, 0, 0, 1.9, 1.9, 0.9, true };
+    Spectrogram mySpec{ 200, 4096, 512, 0, 0, 1.9, 1.9, 0.9, true, is_spherical };
     //Oscilliscope myScope{ 44100 };
 
     void onInit() override { // Called on app start
         std::cout << "onInit()" << std::endl;
         imguiInit();
-        navControl().active(false);
+        if(!is_spherical) navControl().active(false);
     }
 
     void onCreate() override { // Called when graphics context is available
@@ -453,7 +193,7 @@ public:
         //myScope.update();
         
         g.clear();
-        g.camera(Viewpoint::IDENTITY);
+        if(!is_spherical) g.camera(Viewpoint::IDENTITY);
         mySpec.draw(g);
         g.loadIdentity();
 
@@ -469,7 +209,6 @@ public:
         // note that this 'while' can only happen in one place
         while (io()) { 
             mySpec.write_sample(io.out(0));
-            //myScope.writeSample(io.out(0));
         }
     }
 
