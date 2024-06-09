@@ -15,7 +15,7 @@ using namespace al;
 //
 //};
 
-class AcidTest : public SynthVoice{
+class AcidTest : public SynthVoice {
 public:
     gam::Accum<> tmr;
     gam::Saw<> saw;
@@ -25,15 +25,10 @@ public:
     gam::ADSR<> amp_env;
     gam::OnePole<> freq;
     gam::Pan<> pan;
-    int step;
-    float* pitches;  
-    //float* pitches2;  // D minor (ii)
-    //float* pitches3;  // G major (V)
-    //float* pitches4;  // C major (I)
-    float ref;
+    float ref, clip;
     //int seqLength;
-    float debugMax;
 
+    float sample, last_sample;
     float lpf_env_depth;
 
     void init() override {
@@ -42,12 +37,12 @@ public:
         lpf.res(20);
         lpf.freq(440);
 
-        amp_env.attack(0.05);
+        amp_env.attack(0.01);
         amp_env.decay(0.5);
         amp_env.sustain(0.5);
         amp_env.release(0.01);
 
-        lpf_env.attack(0.05);
+        lpf_env.attack(0.01);
         lpf_env.decay(1);
         lpf_env.sustain(0.5);
         lpf_env.release(0.5);
@@ -58,12 +53,10 @@ public:
 
         freq.lag(0.1);
 
-        step = 0;
         ref = 27.5; // A0 = 27.5 Hz
         //int seqLength = 8;
         //pitches = new float[8] { 11, 11, 23, 11, 11, 21, 6, 11 };
         //int seqLength = 16;
-        pitches = new float[16] {13, 13, 21, 13, 13, 23, 13, 18, 13, 13, 21, 13, 25, 23, 18, 13  };
         lpf_env_depth = 0.75;
 
         createInternalTriggerParameter("Amp", 0.3, 0.0, 1.0);
@@ -71,66 +64,61 @@ public:
         createInternalTriggerParameter("keyboard_octave", 2, 0, 8);
 
         createInternalTriggerParameter("LPF:resonance", 4.5, 0.01, 10.0);
-        createInternalTriggerParameter("LPF:frequency_mult", 2, 0.01, 5);
+        createInternalTriggerParameter("LPF:frequency_offset", 2, 0.01, 5);
 
-        createInternalTriggerParameter("AmpEnv:Attack",    0.05,   0.01,   3.0);
-        createInternalTriggerParameter("AmpEnv:Decay",     0.4,    0.01,   3.0);
-        createInternalTriggerParameter("AmpEnv:Sustain",   0.5,    0.01,   3.0);
-        createInternalTriggerParameter("AmpEnv:Release",   0.2,    0.1,    5.0);
+        createInternalTriggerParameter("AmpEnv:Attack", 0.05, 0.01, 3.0);
+        createInternalTriggerParameter("AmpEnv:Decay", 0.4, 0.01, 3.0);
+        createInternalTriggerParameter("AmpEnv:Sustain", 0.5, 0.01, 3.0);
+        createInternalTriggerParameter("AmpEnv:Release", 0.2, 0.1, 5.0);
 
-        createInternalTriggerParameter("LPFFreqEnv:Attack",    0.05,   0.01,   3.0);
-        createInternalTriggerParameter("LPFFreqEnv:Decay",     0.25,   0.01,   3.0);
-        createInternalTriggerParameter("LPFFreqEnv:Sustain",   0.01,   0.01,   3.0);
-        createInternalTriggerParameter("LPFFreqEnv:Release",   0.2,    0.1,    5.0);
-        createInternalTriggerParameter("LPFFreqEnv:Depth",     64,     0.01,   128);
+        createInternalTriggerParameter("LPFFreqEnv:Attack", 0.05, 0.01, 3.0);
+        createInternalTriggerParameter("LPFFreqEnv:Decay", 0.25, 0.01, 3.0);
+        createInternalTriggerParameter("LPFFreqEnv:Sustain", 0.01, 0.01, 3.0);
+        createInternalTriggerParameter("LPFFreqEnv:Release", 0.2, 0.1, 5.0);
+        createInternalTriggerParameter("LPFFreqEnv:Depth", 64, 0.01, 128);
 
         createInternalTriggerParameter("pan", 0.0, -1.0, 1.0);
 
-        createInternalTriggerParameter("useSeq", 0, 0, 1);
-
-        debugMax = 0;
+        clip = 0.5f;
     }
 
     virtual void onProcess(AudioIOData& io) override {
         updateFromParameters();
         float amp = getInternalParameterValue("Amp");
-        float LPFFreqMult = getInternalParameterValue("LPF:frequency_mult");
-        float useSequencer = getInternalParameterValue("useSeq");
+        float LPFFreqOffset = getInternalParameterValue("LPF:frequency_offset");
         float frequency = getInternalParameterValue("f");
         while (io()) {
-            if (abs(useSequencer - 1.f) <= 0.1) {
-                if (tmr()) {
-                    // ref was 50 -> about a G1, now A0
-                    float f = ref * pow(2, (pitches[step]-1) / 12.);
-                    //step = (step + 1) % 8;
-                    step = (step + 1) % 16;
-                    freq = f;
-                   /* amp_env.resetSoft();
-                    lpf_env.resetSoft();*/
-                }
-                square.freq(freq());
-            }
+            sample = square();                          // get the next sample from the square wave 
+            float amp_e = amp_env();                    // get the next value from the amplitude 
+            float lpf_e = lpf_env() * lpf_env_depth;    // get the next value from the low-pass filter envelope and multiply by the LPF depth parameter
+            float lpf_frequency = (LPFFreqOffset + lpf_e) * frequency;  // calculate the frequency the low pass filter 
+            lpf.freq(lpf_frequency);    // set the LPF's frequency to calculated frequency (this changing quickly along with resonance causes clicking noise)
 
-            float s1 = square();
+            /*
+                The LPF's frequency response involves unity gain (no amplitude change) for frequencies below the cutoff, and zero gain for frequencys past it.
+                The resonance of the LPF causes the amplitude of frequencies at the cutoff frequency to be amplified above unity gain (positive amplitude change).
+                Because the LPF's frequency is modulated, and the default attack for the frequency modulation envelope is low, the LPF's frequency sweeps quickly and causes a lot of different frequencies to be amplified at roughly the same time, which causes a "clicking" noise
 
-            float amp_e = amp_env();
-            float lpf_e = lpf_env() * lpf_env_depth;
-            float lpf_frequency = (LPFFreqMult + lpf_e) * frequency;
-            
-            lpf.freq(lpf_frequency);
-            //lpf.freq(e * (modCutoff.paraU() * 6000 + 500) + 40);
-            s1 = lpf(s1) * amp_e * amp;
+                In the future, this can be fixed by reducing the resonance to zero during the attack of the LPF's envelope
+            */
 
-            /*if (abs(s1) >= debugMax) {
-                debugMax = abs(s1);
-                std::cout << debugMax << std::endl;
-            }*/
+            sample = lpf(sample) * amp_e * amp;         // pass the sample through the lowpass filter and multiply it by the amplitude envelope and amplitude parameter
 
+            clip = 2 * amp;     // set the clip to be twice the amplitude
+
+            // clip the sample based on it
+            if (sample > clip) sample = clip;
+            if (sample < -clip) sample = -clip;
+
+            float s1;
             float s2;
-            pan(s1, s1, s2);
-            io.out(0) += s1;
+
+            pan(sample, s1, s2);    // pass the sample through the pan object
+            io.out(0) += s1;        // send the samples to the respective audio output channels
             io.out(1) += s2;
+            last_sample = sample;
         }
+        // when the amplitude envelope is finished, stop generating the signal
         if (amp_env.done()) free();
     }
 
@@ -138,19 +126,19 @@ public:
         updateFromParameters();
         amp_env.reset();
         lpf_env.reset();
-
     }
 
     virtual void onTriggerOff() override {
         amp_env.triggerRelease();
+        lpf_env.triggerRelease();
     }
 
-    void updateFromParameters() {
+    void updateFromParameters() {y
         float frequency = getInternalParameterValue("f");
         square.freq(frequency);
 
         lpf.res(getInternalParameterValue("LPF:resonance"));
-        lpf.freq(getInternalParameterValue("LPF:frequency_mult") * frequency);
+        lpf.freq(getInternalParameterValue("LPF:frequency_offset") * frequency);
 
         amp_env.attack(getInternalParameterValue("AmpEnv:Attack"));
         amp_env.decay(getInternalParameterValue("AmpEnv:Decay"));
@@ -163,8 +151,8 @@ public:
         lpf_env.release(getInternalParameterValue("LPFFreqEnv:Release"));
         lpf_env_depth = getInternalParameterValue("LPFFreqEnv:Depth");
     }
-
 };
+
 
 class MyApp: public App {
 public:
