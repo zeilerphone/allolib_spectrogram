@@ -171,8 +171,8 @@ public:
 
     MyApp() {
         Spectrogram::SpectrogramSphericalParams params = {
-        1000,
-        4096,
+        400,
+        2048,
         256,
         2,
         1.9,
@@ -231,7 +231,7 @@ public:
 
     void onDraw(Graphics &g) override { // Draw function
         //myScope.update();
-        
+        g.blending(true);
         g.clear();
         //if(!is_spherical) g.camera(Viewpoint::IDENTITY);
         //mySpec.draw(g);

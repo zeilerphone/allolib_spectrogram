@@ -16,7 +16,7 @@ namespace al {
     A Grid manages writing to and reading from a vector of Strip objects.
     The number of strip objects and parameters for the strip objects are parameters in the Grid constructor.
     */    
-    class Grid {
+    class Grid : public Mesh{
     public:
         // Constructor for class Grid
         //  w : width (0 - 2) of grid
@@ -24,52 +24,138 @@ namespace al {
         //  ws : number of horizontal segments - how many strips wide
         //  hs : number of vertical segments - how many segments high
         //  is_log : boolean switch for whether to distribute vertical segments linearly or logarithmically
-        Grid(float w, float h, int ws, int hs, bool is_log);
+        Grid(float r, float h, int ws, int hs, bool is_log) :
+            radius(r), height(h), width_of_strips(r* M_2PI / ws),
+            width_segments(ws), height_segments(hs), is_logarithmic(is_log)
+        {
+            this->primitive(TRIANGLES);
+            RGB zero_color = get_color(0.f);
+            this->vertices_bank = new Vertex * [width_segments + 1];
+            this->colors_bank = new RGB * [width_segments + 1];
+
+            float theta = 0;
+            for (int i = 0; i <= width_segments; i++) {
+                this->vertices_bank[i] = new Vertex[height_segments + 1];
+                this->colors_bank[i] = new RGB[height_segments + 1];
+
+                if (!this->colors_bank[i]) {
+                    std::cerr << "Memory allocation for colors_bank[" << i << "] failed." << std::endl;
+                    // Handle the error, possibly with cleanup and exit
+                }
+                float cartX = radius * cos(theta);
+                float cartZ = radius * sin(theta);
+                for (int j = 0; j <= height_segments; j++) {
+                    this->colors_bank[i][j] = zero_color;
+                    if (is_log) {
+                        float log_normalized = log10((float)j + 1.f) / log10(height_segments + 1.f);
+                        float z_pos_log = height * log_normalized - (height / 2);
+                        this->vertices_bank[i][j] = Vertex(cartX, z_pos_log, cartZ);
+                    }
+                    else {
+                        float z_pos_lin = (height_segments / height) * (float)j - (height / 2);
+                        this->vertices_bank[i][j] = Vertex(cartX, z_pos_lin, cartZ);
+                    }
+                }
+                theta -= width_of_strips / radius;
+            }
+
+            for (int i = 0; i < width_segments; i++) {
+                for (int j = 0; j < height_segments; j++) {
+                    this->vertex(this->vertices_bank[i][j]);
+                    this->color(this->colors_bank[i][j]);
+                    this->vertex(this->vertices_bank[i + 1][j]);
+                    this->color(this->colors_bank[i][j]);
+                    this->vertex(this->vertices_bank[i + 1][j + 1]);
+                    this->color(this->colors_bank[i][j]);
+                    this->vertex(this->vertices_bank[i][j]);
+                    this->color(this->colors_bank[i][j]);
+                    this->vertex(this->vertices_bank[i][j + 1]);
+                    this->color(this->colors_bank[i][j]);
+                    this->vertex(this->vertices_bank[i + 1][j + 1]);
+                    this->color(this->colors_bank[i][j]);
+                }
+            }
+            //int strip_scale_factor = 1;
+            //float theta = 0;
+            //for (int i = 0; i < width_segments; i++) {
+            //    theta -= width_of_strips / radius;
+            //    Strip* thisStrip = new Strip(width_of_strips, height, radius, theta, height_segments / strip_scale_factor, is_logarithmic);
+            //    strips.push_back(thisStrip);
+            //}
+            writePointer = 0;
+        }
 
         /*
         * A strip is a mesh of customizable dimension that is two vertices wide and user specified vertices tall.
         * Strips are meant to display data using color, and currently use the same color scheme as Matlab's "Jet" color palette.
         */
-        class Strip : public Mesh {
-        public:
-            // Constructor for class Strip
-            //  w : width (2 is screen width) of strip
-            //  h : height (2 is screen height) of strip
-            //  r : radius of the cylindrical sphere
-            //  t : theta angle of the strip
-            //  s : number of segments the strip should be split into
-            //  is_log : boolean switch for whether to distribute strips linearly or logarithmically
-            Strip(float w, float h, float r, float t, int s, bool is_log);
-
-            /* 
-                Assigns strip vertex colors based off of input std::vector<float>.
-                The size of the vector must be equal to or less than `segments`. 
-                The values in the vector must lie within the range [0,1].
-            */
-            void map_value_to_color(std::vector<float> vals);
-
-        protected:
-            RGB get_color(float val);
-            float angular_width, height, radius, theta, segment_height;
-            int segments;
-            RGB zero_color;
-            bool is_logarithmic;
-        };
+        
 
         // Grid destructor
-        ~Grid();
+        ~Grid() {
+            for (int i = 0; i <= width_segments; i++) {
+                free(this->vertices_bank[i]);
+                free(this->colors_bank[i]);
+            }
+            free(this->vertices_bank);
+            free(this->colors_bank);
+            //for (int i = 0; i < width_segments; i++) {
+            //    delete strips[i];
+            //}
+        }
 
-        // writes a std::vector of floats into the next Strip
-        void write_data(std::vector<float> vals);
+        // writes a std::vector of floats 
+        void write_data(const std::vector<float>& vals) {
+            for (int j = 0; j < height_segments; j++) {
+                RGB curCol = get_color(vals[j]);
+                int offset = ((writePointer * height_segments) + j) * 6;
+                for (int k = 0; k < 6; k++) {
+                    this->colors()[offset + k] = curCol;
+                }
 
-        // returns a pointer to the Strip that is 'index' places past the current Strip
-        Strip* read_data(int index);
+            }
+            writePointer = (writePointer + 1) % width_segments;
+        }
 
     protected:
+        RGB get_color(float val) {
+            // ripped from matlab's jet color map
+            // 0.1242 0.3747 0.6253 0.8758
+            if (val < 0) val = 0;
+            if (val > 1) val = 1;
+            float dr, dg, db;
+            if (val < 0.1242) {
+                db = val * 3.9936 + 0.5042;
+                //db = 0.504 + ((1. - 0.504) / 0.1242) * val;
+                dr = dg = 0;
+            }
+            else if (val < 0.3747) {
+                db = 1.;
+                dr = 0.;
+                dg = val * 3.9920 - 0.4958;
+            }
+            else if (val < 0.6253) {
+                db = 2.495 - val * 3.9904;
+                dg = 1.;
+                dr = val * 3.990 - 1.4952;
+            }
+            else if (val < 0.8758) {
+                db = 0.;
+                dr = 1.;
+                dg = 3.4962 - val * 3.9920;
+            }
+            else {
+                db = 0.;
+                dg = 0.;
+                dr = 4.4962 - val * 3.9920;
+            }
+            return RGB(dr, dg, db);
+        }
+        Vertex** vertices_bank;
+        RGB** colors_bank;
         float radius, height, width_of_strips;
         int width_segments, height_segments;
         int writePointer;
-        std::vector<Strip*> strips;
         bool is_logarithmic;
     };
 
@@ -139,111 +225,10 @@ namespace al {
         int bufferWrite;
         std::vector<std::vector<float>> spectrum;
         gam::STFT stft;
-        Grid::Strip* legend_strip;
         float ref;
     };
 
 
-
-    Grid::Strip::Strip(float aw, float h, float r, float t, int s, bool is_log) : angular_width(aw), height(h), radius(r), theta(t), segments(s), segment_height(h / s), is_logarithmic(is_log)
-    {
-        zero_color = get_color(0.f);
-        float segment_scale_factor = static_cast<float>(segments) / log10(segments);
-        this->primitive(TRIANGLE_STRIP);
-
-        for (int i = 0; i <= segments; i++) {
-            this->color(zero_color);
-            this->color(zero_color);
-            if (is_logarithmic) {
-                float log_normalized = log10(static_cast<float>(i) + 1.f) / log10(segments + 1.f);
-                float z_pos_log = height * log_normalized - (height / 2);
-                this->vertex(radius * cos(theta), z_pos_log, radius * sin(theta));
-                this->vertex(radius * cos(theta + aw), z_pos_log, radius * sin(theta+ aw));
-            }
-            else {
-                float z_pos_lin = segment_height * static_cast<float>(i) - height / 2;
-                this->vertex(radius * cos(theta), z_pos_lin, radius * sin(theta));
-                this->vertex(radius * cos(theta + aw), z_pos_lin, radius * sin(theta+ aw));
-            }
-        }
-    }
-
-    void Grid::Strip::map_value_to_color(std::vector<float> vals) {
-        // need to pass in vector of values between zero and one
-        // zero is for no amplitude, one is for max
-        // first value is the lowest pitch bucket, last is highest
-        // vector needs to have size 'segments' or 'segments + 1'
-        for (int i = 0; i < segments; i++) {
-            RGB curCol = get_color(vals[i]);
-            int twoi = 2 * i;
-            this->colors()[twoi] = curCol;
-            this->colors()[twoi + 1] = curCol;
-        }
-    }
-
-    RGB Grid::Strip::get_color(float val) {
-        // ripped from matlab's jet color map
-        // 0.1242 0.3747 0.6253 0.8758
-        if (val < 0) val = 0;
-        if (val > 1) val = 1;
-        float dr, dg, db;
-        if (val < 0.1242) {
-            db = 4.4976 * val;
-            //db = 0.504 + ((1. - 0.504) / 0.1242) * val;
-            dr = dg = 0;
-        }
-        else if (val < 0.3747) {
-            db = 1.;
-            dr = 0.;
-            dg = (val - 0.1242) * 3.9920;
-        }   
-        else if (val < 0.6253) {
-            db = (0.6253 - val) * 0.2506;
-            dg = 1.;
-            dr = (val - 0.3747) * 0.2506;
-        }
-        else if (val < 0.8758) {
-            db = 0.;
-            dr = 1.;
-            dg = (0.8758 - val) * 3.9920;
-        }
-        else {
-            db = 0.;
-            dg = 0.;
-            dr = 4.4962 - (val * 3.9920);
-        }
-        return RGB(dr, dg, db);
-    }
-
-
-    Grid::Grid(float r, float h, int ws, int hs, bool is_log) :
-        radius(r), height(h), width_of_strips(r * M_2PI / ws),
-        width_segments(ws), height_segments(hs), is_logarithmic(is_log)
-    {
-        int strip_scale_factor = 1;
-        float theta = 0;
-        for (int i = 0; i < width_segments; i++) {
-            theta += width_of_strips / radius;
-            Strip* thisStrip = new Strip(width_of_strips, height, radius, theta, height_segments / strip_scale_factor, is_logarithmic);
-            strips.push_back(thisStrip);
-        }
-        writePointer = 0;
-    }
-
-    Grid::~Grid() {
-        for (int i = 0; i < width_segments; i++) {
-            delete strips[i];
-        }
-    }
-
-    void Grid::write_data(std::vector<float> vals) {
-        strips[writePointer]->map_value_to_color(vals);
-        writePointer = (writePointer + 1) % width_segments;
-    }
-
-    Grid::Strip* Grid::read_data(int index) {
-        return strips[(writePointer + index) % width_segments];
-    }
 
     // Spectrogram flat constructor
     Spectrogram::Spectrogram(int samplerate, int fft_window_size, int hop_size, float x, float z, float w, float h, float ler, bool is_log) :
@@ -289,12 +274,14 @@ namespace al {
 
     void Spectrogram::draw(Graphics& g) {
         // draw spectrogram
-        g.loadIdentity();
+        // g.loadIdentity();
         g.meshColor();
         if(is_spherical){
-            for (int i = 0; i < bufferSize; i++) {
+            //g.draw(*grid.read_data(0));
+            g.draw(grid);
+            /*for (int i = 0; i < bufferSize; i++) {
                 g.draw(*grid.read_data(i));
-            }
+            }*/
         } 
         // else {
         //     g.translate(x_offset, z_offset);
