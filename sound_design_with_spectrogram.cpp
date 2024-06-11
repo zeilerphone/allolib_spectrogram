@@ -24,13 +24,14 @@ using namespace al;
 
 class AcidTest : public SynthVoice{
 public:
-    gam::Accum<> tmr;
-    gam::Saw<> saw;
+    //gam::Accum<> tmr;
+    //gam::Saw<> saw;
     gam::Square<> square;
     gam::Biquad<> lpf;
     gam::ADSR<> lpf_env;
     gam::ADSR<> amp_env;
-    gam::OnePole<> freq;
+    gam::Reson<> a;
+    //gam::OnePole<> freq;
     gam::Pan<> pan;
     float ref, clip;
     //int seqLength;
@@ -55,10 +56,10 @@ public:
         lpf_env.release(0.5);
         //lpf_env.amp(0.75f);
 
-        tmr.freq(120. / 60. * 4.);
-        tmr.phaseMax();
+        //tmr.freq(120. / 60. * 4.);
+        //tmr.phaseMax();
 
-        freq.lag(0.1);
+        //freq.lag(0.1);
 
         ref = 27.5; // A0 = 27.5 Hz
         //int seqLength = 8;
