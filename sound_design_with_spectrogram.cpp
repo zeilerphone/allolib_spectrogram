@@ -165,13 +165,52 @@ class MyApp: public App {
 public:
     bool is_spherical = false;
     SynthGUIManager<AcidTest> synthManager{ "" };
-    Spectrogram mySpec{ 200, 4096, 512, 0, 0, 1.9, 1.9, 0.9, true, is_spherical };
+    //Spectrogram mySpec{ 200, 4096, 512, 0, 0, 1.9, 1.9, 0.9, false, is_spherical };
     //Oscilliscope myScope{ 44100 };
+    Spectrogram* mySpec2;
 
+    MyApp() {
+        Spectrogram::SpectrogramSphericalParams params = {
+        1000,
+        4096,
+        256,
+        2,
+        1.9,
+        true,
+        true,
+        1
+        //     .buffer_size = 400,
+        // .fft_window_size = 2048,
+        // .hop_size = 256,
+        // .w = 2,
+        // .h = 1.9,
+        // .is_log = false,
+        // .is_sphere = true,
+        // // is_sphere params
+        // .radius = 1
+        };
+        mySpec2 = new Spectrogram {params};
+    }
+    ~MyApp() {
+        delete mySpec2;
+    }
+
+    
+    // static const struct SpectrogramSphericalParams params = {
+    //     .buffer_size = 400,
+    //     .fft_window_size = 2048,
+    //     .hop_size = 256,
+    //     .w = 2,
+    //     .h = 1.9,
+    //     .is_log = false,
+    //     .is_sphere = true,
+    //     // is_sphere params
+    //     .radius = 1
+    // };
     void onInit() override { // Called on app start
         std::cout << "onInit()" << std::endl;
         imguiInit();
-        if(!is_spherical) navControl().active(false);
+        //if(!is_spherical) navControl().active(false);
     }
 
     void onCreate() override { // Called when graphics context is available
@@ -194,8 +233,9 @@ public:
         //myScope.update();
         
         g.clear();
-        if(!is_spherical) g.camera(Viewpoint::IDENTITY);
-        mySpec.draw(g);
+        //if(!is_spherical) g.camera(Viewpoint::IDENTITY);
+        //mySpec.draw(g);
+        mySpec2->draw(g);
         g.loadIdentity();
 
         //g.color(1);
@@ -209,7 +249,8 @@ public:
 
         // note that this 'while' can only happen in one place
         while (io()) { 
-            mySpec.write_sample(io.out(0));
+            //mySpec.write_sample(io.out(0));
+            mySpec2->write_sample(io.out(0));
         }
     }
 
@@ -217,7 +258,7 @@ public:
         m.print();
     }
 
-    bool onKeyDown(Keyboard const& k) override {
+    /*bool onKeyDown(Keyboard const& k) override {
         int midiNote = asciiToMIDI(k.key());
         if (midiNote > 0) {
             float oct = floor(synthManager.voice()->getInternalParameter("keyboard_octave"));
@@ -234,7 +275,7 @@ public:
             synthManager.triggerOff(midiNote);
         }
         return true;
-    }
+    }*/
 
     void onExit() override { imguiShutdown(); }
 };
