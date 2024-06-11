@@ -30,7 +30,7 @@ public:
     gam::Biquad<> lpf;
     gam::ADSR<> lpf_env;
     gam::ADSR<> amp_env;
-    gam::Reson<> a;
+    gam::Reson<> a; 
     //gam::OnePole<> freq;
     gam::Pan<> pan;
     float ref, clip;
