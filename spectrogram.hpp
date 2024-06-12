@@ -24,10 +24,17 @@ namespace al {
         //  ws : number of horizontal segments - how many strips wide
         //  hs : number of vertical segments - how many segments high
         //  is_log : boolean switch for whether to distribute vertical segments linearly or logarithmically
-        Grid(float r, float h, int ws, int hs, bool is_log) :
-            radius(r), height(h), width_of_strips(r* M_2PI / ws),
+        Grid(float r_or_w, float h, int ws, int hs, bool is_log, bool is_spherical) :
+            radius(r_or_w), width(r_or_w), height(h),
             width_segments(ws), height_segments(hs), is_logarithmic(is_log)
         {
+            if (is_spherical) {
+                width_of_strips = radius * M_2PI / width_segments;
+            }
+            else {
+                width_of_strips = width / width_segments;
+            }
+
             this->primitive(TRIANGLES);
             RGB zero_color = get_color(0.f);
             this->vertices_bank = new Vertex * [width_segments + 1];
@@ -42,21 +49,27 @@ namespace al {
                     std::cerr << "Memory allocation for colors_bank[" << i << "] failed." << std::endl;
                     // Handle the error, possibly with cleanup and exit
                 }
+                
                 float cartX = radius * cos(theta);
                 float cartZ = radius * sin(theta);
+                float non_sphereX = width * i / width_segments;
                 for (int j = 0; j <= height_segments; j++) {
                     this->colors_bank[i][j] = zero_color;
                     if (is_log) {
                         float log_normalized = log10((float)j + 1.f) / log10(height_segments + 1.f);
                         float z_pos_log = height * log_normalized - (height / 2);
-                        this->vertices_bank[i][j] = Vertex(cartX, z_pos_log, cartZ);
+                        if (is_spherical) this->vertices_bank[i][j] = Vertex(cartX, z_pos_log, cartZ);
+                        else this->vertices_bank[i][j] = Vertex(non_sphereX, z_pos_log);
                     }
                     else {
                         float z_pos_lin = (height_segments / height) * (float)j - (height / 2);
-                        this->vertices_bank[i][j] = Vertex(cartX, z_pos_lin, cartZ);
+                        if(is_spherical) this->vertices_bank[i][j] = Vertex(cartX, z_pos_lin, cartZ);
+                        else this->vertices_bank[i][j] = Vertex(non_sphereX, z_pos_lin);
                     }
+                
                 }
                 theta -= width_of_strips / radius;
+                
             }
 
             for (int i = 0; i < width_segments; i++) {
@@ -104,7 +117,7 @@ namespace al {
             //}
         }
 
-        // writes a std::vector of floats 
+        // writes a std::vector of floats to the column at the writePointer
         void write_data(const std::vector<float>& vals) {
             for (int j = 0; j < height_segments; j++) {
                 RGB curCol = get_color(vals[j]);
@@ -153,7 +166,7 @@ namespace al {
         }
         Vertex** vertices_bank;
         RGB** colors_bank;
-        float radius, height, width_of_strips;
+        float radius, width, height, width_of_strips;
         int width_segments, height_segments;
         int writePointer;
         bool is_logarithmic;
