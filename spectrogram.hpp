@@ -80,13 +80,14 @@ namespace al {
     class Spectrogram {
     public:
         // Constructor for class Spectrogram
-        //  buffer_size: determines how many past STFT outputs the Spectrogram should store
+        //  buffer_size: determines how many past STFT outputs the Spectrogram should store and display
         //  fft_window_size: determines how many bins the Short-Time Fourier Transform uses
+        //  hop_size: determines how many samples the STFT should wait for before calculating the next set of spectrum values
         //  x,z: the x and y coordinate offset for the spectrogram display
         //  w,h: the width and height of the spectrogram respectively
-        //  ler: legend ratio - what percentage of the width and height for spectrogram vs legend
+        //  ler: legend ratio - what percentage of the width for spectrogram vs legend
         //  is_log: switch for linear or logarithmic frequency display
-        Spectrogram(int buffer_size, int fft_window_size, int hop_size, float x, float z, float w, float h, float ler, bool is_log, bool is_sphere);
+        Spectrogram(int buffer_size, int fft_window_size, int hop_size, float x, float z, float w, float h, float ler, bool is_log);
 
         // writes a sample from audio output to the internal STFT and buffers
         void write_sample(float sample);
@@ -107,7 +108,7 @@ namespace al {
         int bufferSize, numBins, hopSize;
         float width, height, x_offset, z_offset;
         float grid_width, legend_ratio;
-        bool is_logarithmic, is_spherical;
+        bool is_logarithmic;
 
         int bufferWrite;
         std::vector<std::vector<float>> spectrum;
@@ -213,11 +214,11 @@ namespace al {
         return strips[(writePointer + index) % width_segments];
     }
 
-    Spectrogram::Spectrogram(int samplerate, int fft_window_size, int hop_size, float x, float z, float w, float h, float ler, bool is_log, bool is_sphere) :
+    Spectrogram::Spectrogram(int samplerate, int fft_window_size, int hop_size, float x, float z, float w, float h, float ler, bool is_log) :
         bufferSize(samplerate), numBins(fft_window_size), hopSize(hop_size), grid_width(w* ler), legend_ratio(ler),
         stft(fft_window_size, hop_size, 0, gam::HANN, gam::MAG_FREQ),
         grid(w* ler, h, samplerate, fft_window_size, is_log), width(w), height(h), x_offset(x), z_offset(z), 
-        is_logarithmic(is_log), is_spherical(is_sphere)
+        is_logarithmic(is_log)
     {
         spectrum.resize(bufferSize);
         for (int i = 0; i < bufferSize; i++) {
@@ -244,7 +245,6 @@ namespace al {
         g.loadIdentity();
         g.meshColor();
         g.translate(x_offset, z_offset);
-        //if(is_spherical) g.translate()
         g.translate((-width + grid_width / bufferSize) / 2.f, 0);
         for (int i = 0; i < bufferSize; i++) {
             g.draw(*grid.read_data(i));
@@ -255,6 +255,7 @@ namespace al {
         g.translate(x_offset, z_offset);
         g.translate((width - (1 - legend_ratio) * 1.5 * width / 2) / 2.f, 0);
         g.draw(*legend_strip);
+        g.loadIdentity();
     }
 
     void Spectrogram::process_audio(AudioIOData& io) {

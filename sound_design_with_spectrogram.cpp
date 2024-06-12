@@ -163,15 +163,13 @@ public:
 
 class MyApp: public App {
 public:
-    bool is_spherical = false;
     SynthGUIManager<AcidTest> synthManager{ "" };
-    Spectrogram mySpec{ 200, 4096, 512, 0, 0, 1.9, 1.9, 0.9, true, is_spherical };
-    //Oscilliscope myScope{ 44100 };
+    Spectrogram mySpec{ 200, 4096, 512, 0, 0, 1.9, 1.9, 0.9, true};
 
     void onInit() override { // Called on app start
         std::cout << "onInit()" << std::endl;
         imguiInit();
-        if(!is_spherical) navControl().active(false);
+        navControl().active(false);
     }
 
     void onCreate() override { // Called when graphics context is available
@@ -180,26 +178,15 @@ public:
     }
 
     void onAnimate(double dt) override { // Called once before drawing
-        /*color += 0.01;
-        if (color > 1.0) {
-            color -= 1.0;
-        }*/
-        //oscillator.freq(220 + 880 * color);
         imguiBeginFrame();
         synthManager.drawSynthControlPanel();
         imguiEndFrame();
     } 
 
     void onDraw(Graphics &g) override { // Draw function
-        //myScope.update();
-        
         g.clear();
-        if(!is_spherical) g.camera(Viewpoint::IDENTITY);
+        g.camera(Viewpoint::IDENTITY);
         mySpec.draw(g);
-        g.loadIdentity();
-
-        //g.color(1);
-        //g.draw(myScope);
         imguiDraw();
     }
 
