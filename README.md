@@ -23,3 +23,7 @@ For it to work properly, some member functions need to be called throughout the 
 If these steps are followed correctly, the object will process and render the spectrogram for any input.
 
 # Sound Design
+The `sound_design_with_spectrogram.cpp` file contains my implementation of an Acid Bass synth sound. It also demonstrates how to use the spectrogram header file. An in depth explanation of how it works can be found in the repository linked [here](#further-information).
+
+# Further information
+https://github.com/allolib-s24/notes-zeilerphone
