@@ -30,10 +30,13 @@ namespace al {
         {
             this->primitive(TRIANGLES);
             RGB zero_color = get_color(0.f);
+            rotation_theta = 0.f;
             this->vertices_bank = new Vertex * [width_segments + 1];
             this->colors_bank = new RGB * [width_segments + 1];
 
-            float theta = 0;
+            float theta = M_PI / 3;
+            float phi = 0;
+            float cartX, cartY, cartZ, currentY;
             for (int i = 0; i <= width_segments; i++) {
                 this->vertices_bank[i] = new Vertex[height_segments + 1];
                 this->colors_bank[i] = new RGB[height_segments + 1];
@@ -42,19 +45,24 @@ namespace al {
                     std::cerr << "Memory allocation for colors_bank[" << i << "] failed." << std::endl;
                     // Handle the error, possibly with cleanup and exit
                 }
-                float cartX = radius * cos(theta);
-                float cartZ = radius * sin(theta);
+                //float cartX = radius * cos(theta);
+                //float cartZ = radius * sin(theta);
                 for (int j = 0; j <= height_segments; j++) {
-                    this->colors_bank[i][j] = zero_color;
                     if (is_log) {
                         float log_normalized = log10((float)j + 1.f) / log10(height_segments + 1.f);
-                        float z_pos_log = height * log_normalized - (height / 2);
-                        this->vertices_bank[i][j] = Vertex(cartX, z_pos_log, cartZ);
+                        currentY = height * log_normalized - (height / 2);
                     }
                     else {
-                        float z_pos_lin = (height_segments / height) * (float)j - (height / 2);
-                        this->vertices_bank[i][j] = Vertex(cartX, z_pos_lin, cartZ);
+                        currentY = (height_segments / height) * (float)j - (height / 2);
                     }
+                    phi = M_PI_2 - currentY / this->radius;
+
+                    cartX = this->radius * sinf(phi) * cosf(theta);
+                    cartY = this->radius * sinf(phi) * sinf(theta);
+                    cartZ = this->radius * cosf(phi);
+
+                    this->colors_bank[i][j] = zero_color;
+                    this->vertices_bank[i][j] = Vertex(cartX, cartZ, cartY);
                 }
                 theta -= width_of_strips / radius;
             }
@@ -106,15 +114,28 @@ namespace al {
 
         // writes a std::vector of floats 
         void write_data(const std::vector<float>& vals) {
+            Colors these_colors = this->colors();
             for (int j = 0; j < height_segments; j++) {
                 RGB curCol = get_color(vals[j]);
                 int offset = ((writePointer * height_segments) + j) * 6;
                 for (int k = 0; k < 6; k++) {
-                    this->colors()[offset + k] = curCol;
+                    these_colors[offset + k] = curCol;
                 }
 
             }
+
+        }
+
+        void rotate_matrix() {
+            float c_theta = cos(rotation_theta);
+            float s_theta = sin(rotation_theta);
+            Mat4f rotation_matrix{ c_theta, 0, -s_theta, 0,
+                                   0,       1, 0,        0,
+                                   s_theta, 0, c_theta,  0,
+                                   0,       0, 0,        0 };
             writePointer = (writePointer + 1) % width_segments;
+            this->transform(rotation_matrix, 0, -1);
+            rotation_theta -= width_of_strips / radius;
         }
 
     protected:
@@ -153,7 +174,7 @@ namespace al {
         }
         Vertex** vertices_bank;
         RGB** colors_bank;
-        float radius, height, width_of_strips;
+        float radius, height, width_of_strips, rotation_theta;
         int width_segments, height_segments;
         int writePointer;
         bool is_logarithmic;

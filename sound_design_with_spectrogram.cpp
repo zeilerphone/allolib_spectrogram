@@ -171,11 +171,11 @@ public:
 
     MyApp() {
         Spectrogram::SpectrogramSphericalParams params = {
-        400,
+        375,
         2048,
         256,
         2,
-        1.9,
+        3,
         true,
         true,
         1
