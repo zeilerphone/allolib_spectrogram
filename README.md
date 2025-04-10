@@ -1,3 +1,5 @@
+[Allolib](https://github.com/AlloSphere-Research-Group/allolib) is an open source library for interactive multimedia application development. 
+
 This repository contains two things:
 - the `spectrogram.hpp` file which can be included in any Allolib project and gives access to the class `al::Spectrogram`
 - the `sound_design_with_spectrogram.cpp` file which demonstrates utilizing a Spectrogram object
